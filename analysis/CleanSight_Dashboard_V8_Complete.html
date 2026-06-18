@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CleanSight 2.0 - Drilling Analytics Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #06080c;
+            --bg-secondary: #0d1117;
+            --bg-card: #161b22;
+            --bg-elevated: #1c2128;
+            --bg-hover: #21262d;
+            --border: #30363d;
+            --border-subtle: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --orange: #f26522;
+            --orange-bright: #ff7a3d;
+            --orange-dim: rgba(242, 101, 34, 0.15);
+            --cyan: #00d4ff;
+            --cyan-dim: rgba(0, 212, 255, 0.12);
+            --green: #3fb950;
+            --green-bright: #56d364;
+            --green-dim: rgba(63, 185, 80, 0.12);
+            --yellow: #d29922;
+            --yellow-dim: rgba(210, 153, 34, 0.12);
+            --red: #f85149;
+            --red-dim: rgba(248, 81, 73, 0.12);
+            --purple: #a371f7;
+            --teal: #2dd4bf;
+            --pink: #f472b6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: var(--bg-primary); 
+            color: var(--text-primary); 
+            min-height: 100vh; 
+            font-size: 14px; 
+            line-height: 1.5;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+            background: var(--bg-secondary); border-right: 1px solid var(--border);
+            transform: translateX(-220px); transition: transform 0.25s ease; z-index: 200;
+            display: flex; flex-direction: column;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-title { font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .sidebar-close { width: 28px; height: 28px; background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+        .sidebar-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .sidebar-nav { flex: 1; padding: 8px 0; }
+        .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; border-left: 3px solid transparent; }
+        .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .sidebar-item.active { color: var(--text-primary); background: var(--bg-elevated); border-left-color: var(--orange); }
+        .sidebar-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; opacity: 0.6; }
+        .sidebar-icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+        .sidebar-item:hover .sidebar-icon, .sidebar-item.active .sidebar-icon { opacity: 1; }
+        .sidebar-badge { margin-left: auto; background: var(--red); color: white; font-size: 0.6rem; font-weight: 600; padding: 2px 6px; border-radius: 8px; min-width: 18px; text-align: center; }
+        .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); font-size: 0.65rem; color: var(--text-muted); }
+        .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; visibility: hidden; transition: all 0.25s; z-index: 150; }
+        .sidebar-overlay.open { opacity: 1; visibility: visible; }
+
+        /* Header */
+        .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-subtle); }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .menu-btn { width: 36px; height: 36px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.15s; }
+        .menu-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .logo { display: flex; align-items: center; gap: 8px; }
+        .logo-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--orange), var(--orange-bright)); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; color: white; }
+        .logo-text { font-weight: 700; font-size: 1.05rem; }
+        .logo-text span { color: var(--orange); }
+        
+        /* Well Selector Dropdown */
+        .well-selector { position: relative; }
+        .well-selector-btn { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .well-selector-btn:hover { border-color: var(--orange); }
+        .well-name { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600; color: var(--cyan); }
+        .well-meta { font-size: 0.7rem; color: var(--text-muted); }
+        .well-selector-arrow { color: var(--text-muted); font-size: 0.7rem; margin-left: 8px; transition: transform 0.2s; }
+        .well-selector.open .well-selector-arrow { transform: rotate(180deg); }
+        .well-dropdown { position: absolute; top: 100%; left: 0; margin-top: 4px; min-width: 280px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none; z-index: 50; }
+        .well-selector.open .well-dropdown { display: block; }
+        .well-dropdown-header { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+        .well-dropdown-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; cursor: pointer; transition: background 0.15s; }
+        .well-dropdown-item:hover { background: var(--bg-hover); }
+        .well-dropdown-item.active { background: var(--orange-dim); }
+        .well-dropdown-name { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-primary); }
+        .well-dropdown-section { font-size: 0.7rem; color: var(--text-muted); }
+        .well-dropdown-status { width: 8px; height: 8px; border-radius: 50%; }
+        .well-dropdown-status.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .well-dropdown-status.offline { background: var(--text-muted); }
+        
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .rig-time { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-secondary); padding: 6px 10px; background: var(--bg-card); border-radius: 4px; }
+        .op-state { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--green); border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--green); }
+        .op-state-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-pill { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--green-dim); border: 1px solid var(--green); border-radius: 12px; font-size: 0.7rem; font-weight: 600; color: var(--green); }
+        .status-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+        /* Tabs */
+        .nav-tabs { display: flex; padding: 0 20px; }
+        .nav-tab { padding: 12px 18px; background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .nav-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+        .nav-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        /* Main */
+        .main { padding: 16px 20px; max-width: 1920px; margin: 0 auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Banner */
+        .decision-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: linear-gradient(90deg, var(--green-dim) 0%, var(--bg-card) 100%); border: 1px solid var(--green); border-radius: 8px; margin-bottom: 14px; }
+        .decision-banner.warning { background: linear-gradient(90deg, var(--yellow-dim) 0%, var(--bg-card) 100%); border-color: var(--yellow); }
+        .decision-banner.critical { background: linear-gradient(90deg, var(--red-dim) 0%, var(--bg-card) 100%); border-color: var(--red); }
+        .decision-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; background: var(--green-dim); border: 2px solid var(--green); flex-shrink: 0; }
+        .decision-banner.warning .decision-icon { background: var(--yellow-dim); border-color: var(--yellow); }
+        .decision-banner.critical .decision-icon { background: var(--red-dim); border-color: var(--red); }
+        .decision-title { font-size: 0.9rem; font-weight: 600; color: var(--green); }
+        .decision-banner.warning .decision-title { color: var(--yellow); }
+        .decision-banner.critical .decision-title { color: var(--red); }
+        .decision-text { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+
+        /* Time Controls */
+        .time-controls { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+        .time-group { display: flex; align-items: center; gap: 6px; }
+        .time-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-right: 6px; font-weight: 500; }
+        .time-btn { padding: 5px 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 4px; color: var(--text-secondary); font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; cursor: pointer; }
+        .time-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .time-btn.active { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+        .time-display { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--cyan); padding: 5px 12px; background: var(--bg-elevated); border-radius: 4px; }
+
+        /* KPI Grid */
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+        .kpi-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; position: relative; }
+        .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius: 8px 8px 0 0; }
+        .kpi-card.green::before { background: var(--green); }
+        .kpi-card.cyan::before { background: var(--cyan); }
+        .kpi-card.orange::before { background: var(--orange); }
+        .kpi-card.purple::before { background: var(--purple); }
+        .kpi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .kpi-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+        .kpi-status { font-size: 0.55rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+        .kpi-status.green { background: var(--green-dim); color: var(--green); }
+        .kpi-status.cyan { background: var(--cyan-dim); color: var(--cyan); }
+        .kpi-value { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 700; }
+        .kpi-card.green .kpi-value { color: var(--green); }
+        .kpi-card.cyan .kpi-value { color: var(--cyan); }
+        .kpi-card.orange .kpi-value { color: var(--orange); }
+        .kpi-card.purple .kpi-value { color: var(--purple); }
+        .kpi-unit { font-size: 0.75rem; opacity: 0.7; }
+        .kpi-spark { width: 100%; height: 32px; margin-top: 6px; }
+        .kpi-trend { font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Charts */
+        .charts-stack { display: flex; flex-direction: column; gap: 1px; background: var(--border-subtle); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .chart-row { background: var(--bg-secondary); padding: 10px 14px; }
+        .chart-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .chart-label { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; display: flex; align-items: center; gap: 8px; }
+        .chart-label-dot { width: 8px; height: 8px; border-radius: 2px; }
+        .chart-legend { display: flex; gap: 14px; font-size: 0.65rem; color: var(--text-muted); }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-dot { width: 10px; height: 3px; border-radius: 1px; }
+        .legend-dot.dotted { width: 6px; height: 6px; border-radius: 50%; }
+        .chart-wrap { height: 80px; position: relative; }
+        .chart-wrap.tall { height: 110px; }
+
+        /* Grids */
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+        /* Cards */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-elevated); }
+        .card-title { font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .card-title::before { content:''; width:3px; height:14px; background:var(--orange); border-radius:2px; }
+        .card-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; padding: 3px 8px; border-radius: 4px; background: var(--cyan-dim); color: var(--cyan); }
+        .card-badge.green { background: var(--green-dim); color: var(--green); }
+        .card-badge.yellow { background: var(--yellow-dim); color: var(--yellow); }
+        .card-body { padding: 14px; }
+
+        /* Stats */
+        .stat-box { background: var(--bg-elevated); border-radius: 6px; padding: 12px; text-align: center; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; font-weight: 600; }
+        .stat-value.orange { color: var(--orange); }
+        .stat-value.cyan { color: var(--cyan); }
+        .stat-value.green { color: var(--green); }
+        .stat-value.yellow { color: var(--yellow); }
+        .stat-label { font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Progress */
+        .progress-item { margin-bottom: 14px; }
+        .progress-header { display: flex; justify-content: space-between; font-size: 0.7rem; margin-bottom: 5px; }
+        .progress-label { color: var(--text-secondary); }
+        .progress-value { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+        .progress-bar { height: 10px; background: var(--bg-elevated); border-radius: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 5px; }
+        .progress-fill.green { background: linear-gradient(90deg, var(--green), var(--green-bright)); }
+        .progress-fill.cyan { background: linear-gradient(90deg, var(--cyan), #40e0ff); }
+
+        /* Gauge */
+        .gauge-section { text-align: center; }
+        .gauge-outer { width: 160px; height: 160px; margin: 0 auto 12px; border-radius: 50%; background: conic-gradient(var(--green) 0deg 324deg, var(--bg-elevated) 324deg 360deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px rgba(63, 185, 80, 0.2); }
+        .gauge-inner { width: 130px; height: 130px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .gauge-value { font-family: 'JetBrains Mono', monospace; font-size: 2.5rem; font-weight: 700; color: var(--green); }
+        .gauge-label { font-size: 0.7rem; color: var(--text-muted); }
+        .gauge-status { font-size: 0.85rem; font-weight: 600; color: var(--green); }
+
+        /* Semi-circular gauge */
+        .shaker-gauge-container { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .shaker-gauge { text-align: center; }
+        .shaker-gauge-title { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 8px; }
+        .shaker-gauge-svg { width: 120px; height: 70px; }
+        .shaker-gauge-value { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-top: 4px; }
+
+        /* Status items */
+        .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .status-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-elevated); border-radius: 6px; font-size: 0.75rem; }
+        .status-indicator { width: 8px; height: 8px; border-radius: 2px; background: var(--text-muted); }
+        .status-indicator.good { background: var(--green); }
+        .status-indicator.warning { background: var(--yellow); }
+        .status-label { flex: 1; color: var(--text-secondary); }
+        .status-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        .status-value.good { color: var(--green); }
+        .status-value.warning { color: var(--yellow); }
+
+        /* Well chips & presets */
+        .well-filter-row { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+        .preset-btns { display: flex; gap: 6px; }
+        .preset-btn { padding: 6px 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; font-size: 0.7rem; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+        .preset-btn:hover { border-color: var(--cyan); color: var(--text-primary); }
+        .preset-btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+        .well-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .well-chip { padding: 6px 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 16px; font-size: 0.75rem; cursor: pointer; }
+        .well-chip:hover { border-color: var(--cyan); }
+        .well-chip.selected { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+
+        /* Tables */
+        .comparison-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .comparison-table th, .comparison-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+        .comparison-table th { background: var(--bg-elevated); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.65rem; cursor: pointer; }
+        .comparison-table th:hover { color: var(--text-primary); }
+        .comparison-table .good { color: var(--green); }
+        .comparison-table .warning { color: var(--yellow); }
+        .comparison-table .bad { color: var(--red); }
+        .comparison-table .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Shaker grid */
+        .shaker-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
+        .shaker-cell { background: var(--bg-elevated); border-radius: 6px; padding: 10px; text-align: center; border: 1px solid transparent; }
+        .shaker-cell.active { border-color: var(--green); }
+        .shaker-value { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
+        .shaker-label { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Insight */
+        .insight-box { background: var(--bg-elevated); border-left: 3px solid var(--cyan); padding: 12px 14px; border-radius: 0 6px 6px 0; margin-top: 14px; }
+        .insight-title { font-size: 0.75rem; font-weight: 600; color: var(--cyan); margin-bottom: 4px; }
+        .insight-text { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.5; }
+
+        /* Depth interval chart */
+        .depth-interval-container { margin-top: 14px; }
+        .depth-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .depth-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text-muted); width: 80px; text-align: right; }
+        .depth-bar-wrap { flex: 1; height: 16px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden; position: relative; }
+        .depth-bar-measured { height: 100%; border-radius: 3px; }
+        .depth-bar-theoretical { position: absolute; top: 0; height: 100%; border-left: 2px dashed var(--cyan); }
+        .depth-ratio { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; width: 45px; }
+
+        @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">Navigation</span>
+            <button class="sidebar-close" id="sidebarClose">✕</button>
+        </div>
+        <div class="sidebar-nav">
+            <div class="sidebar-item active"><span class="sidebar-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Home</div>
+            <div class="sidebar-item"><span class="sidebar-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Settings</div>
+            <div class="sidebar-item"><span class="sidebar-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>Alerts<span class="sidebar-badge">3</span></div>
+            <div class="sidebar-item"><span class="sidebar-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>Reports</div>
+            <div class="sidebar-item"><span class="sidebar-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>Engineering Tools</div>
+        </div>
+        <div class="sidebar-footer">CleanSight® 2.0 — DrillDocs</div>
+    </nav>
+
+    <header class="header">
+        <div class="header-top">
+            <div class="header-left">
+                <button class="menu-btn" id="menuBtn">☰</button>
+                <div class="logo"><div class="logo-mark">CS</div><div class="logo-text">Clean<span>Sight</span> 2.0</div></div>
+                
+                <!-- Well/Rig Selector Dropdown -->
+                <div class="well-selector" id="wellSelector">
+                    <div class="well-selector-btn" id="wellSelectorBtn">
+                        <div>
+                            <div class="well-name">25_2-D-11 T3</div>
+                            <div class="well-meta">12.25" Section • Stabroek Block</div>
+                        </div>
+                        <span class="well-selector-arrow">▼</span>
+                    </div>
+                    <div class="well-dropdown">
+                        <div class="well-dropdown-header">Select Well / Rig</div>
+                        <div class="well-dropdown-item active">
+                            <div><div class="well-dropdown-name">25_2-D-11 T3</div><div class="well-dropdown-section">12.25" • Stabroek Block</div></div>
+                            <div class="well-dropdown-status live"></div>
+                        </div>
+                        <div class="well-dropdown-item">
+                            <div><div class="well-dropdown-name">25_2-D-12 T5</div><div class="well-dropdown-section">17.5" • Stabroek Block</div></div>
+                            <div class="well-dropdown-status live"></div>
+                        </div>
+                        <div class="well-dropdown-item">
+                            <div><div class="well-dropdown-name">LIZ_3P13</div><div class="well-dropdown-section">12.25" • Liza Field</div></div>
+                            <div class="well-dropdown-status offline"></div>
+                        </div>
+                        <div class="well-dropdown-item">
+                            <div><div class="well-dropdown-name">YT_3P06</div><div class="well-dropdown-section">17.5" • Yellowtail</div></div>
+                            <div class="well-dropdown-status offline"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="rig-time" id="rigTime">May 05, 2026 14:32:18</div>
+                <div class="op-state"><div class="op-state-dot"></div>DRILLING</div>
+                <div class="status-pill"><div class="status-dot"></div>LIVE</div>
+            </div>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="realtime">Realtime</button>
+            <button class="nav-tab" data-tab="holecleaning">Hole Cleaning</button>
+            <button class="nav-tab" data-tab="tripping">Tripping</button>
+            <button class="nav-tab" data-tab="compare">Compare Wells</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- REALTIME TAB -->
+        <div class="tab-content active" id="tab-realtime">
+            <div class="decision-banner">
+                <div class="decision-icon">✓</div>
+                <div class="decision-content">
+                    <div class="decision-title">Hole Cleaning Normal — Continue Operations</div>
+                    <div class="decision-text">TCR ratio 1.07 within normal range. UFO rate 0.4/hr stable. No anomalies detected.</div>
+                </div>
+            </div>
+            <div class="time-controls">
+                <div class="time-group">
+                    <span class="time-label">Window:</span>
+                    <button class="time-btn" data-window="1">1H</button>
+                    <button class="time-btn" data-window="2">2H</button>
+                    <button class="time-btn active" data-window="6">6H</button>
+                    <button class="time-btn" data-window="12">12H</button>
+                    <button class="time-btn" data-window="24">24H</button>
+                    <button class="time-btn" data-window="72">3D</button>
+                    <button class="time-btn" data-window="all">All</button>
+                </div>
+                <div class="time-group">
+                    <span class="time-label">Resolution:</span>
+                    <button class="time-btn" data-res="1s">1s</button>
+                    <button class="time-btn" data-res="10s">10s</button>
+                    <button class="time-btn active" data-res="1m">1m</button>
+                    <button class="time-btn" data-res="5m">5m</button>
+                    <button class="time-btn" data-res="15m">15m</button>
+                </div>
+                <div class="time-display">08:30 — 14:30 (6H @ 1m)</div>
+            </div>
+            <div class="kpi-grid">
+                <div class="kpi-card green"><div class="kpi-header"><div class="kpi-label">TCR Ratio</div><div class="kpi-status green">NORMAL</div></div><div class="kpi-value">1.07</div><div class="kpi-spark"><canvas id="sparkTCR"></canvas></div><div class="kpi-trend">→ Stable 2 hrs</div></div>
+                <div class="kpi-card green"><div class="kpi-header"><div class="kpi-label">UFO Rate</div><div class="kpi-status green">NORMAL</div></div><div class="kpi-value">0.4 <span class="kpi-unit">/hr</span></div><div class="kpi-spark"><canvas id="sparkUFO"></canvas></div><div class="kpi-trend">↓ 15% from prev stand</div></div>
+                <div class="kpi-card cyan"><div class="kpi-header"><div class="kpi-label">CRR Current</div><div class="kpi-status cyan">ACTIVE</div></div><div class="kpi-value">0.042 <span class="kpi-unit">m³/min</span></div><div class="kpi-spark"><canvas id="sparkCRR"></canvas></div><div class="kpi-trend">Drilling mode</div></div>
+                <div class="kpi-card orange"><div class="kpi-header"><div class="kpi-label">CSD P50</div><div class="kpi-status green">STABLE</div></div><div class="kpi-value">14.2 <span class="kpi-unit">mm</span></div><div class="kpi-spark"><canvas id="sparkCSD"></canvas></div><div class="kpi-trend">No formation change</div></div>
+                <div class="kpi-card purple"><div class="kpi-header"><div class="kpi-label">Lag Depth</div><div class="kpi-status cyan">TRACKING</div></div><div class="kpi-value">3,245 <span class="kpi-unit">m</span></div><div class="kpi-spark"><canvas id="sparkLag"></canvas></div><div class="kpi-trend">12 min lag time</div></div>
+            </div>
+            <div class="charts-stack">
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--orange)"></div>TCR (bbl)</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Measured</div><div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Theoretical</div></div></div><div class="chart-wrap tall"><canvas id="chartTCR"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--teal)"></div>ACR (%)</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Accumulated Recovery</div></div></div><div class="chart-wrap"><canvas id="chartACR"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--cyan)"></div>Flow (gpm)</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Flow In</div><div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Flow Out</div></div></div><div class="chart-wrap"><canvas id="chartFlow"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--red)"></div>SPP (psi)</div></div><div class="chart-wrap"><canvas id="chartSPP"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--orange)"></div>ROP (ft/h)</div></div><div class="chart-wrap"><canvas id="chartROP"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--green)"></div>ECD / ESD (ppg)</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>ECD</div><div class="legend-item"><div class="legend-dot dotted" style="background:var(--pink)"></div>ESD</div></div></div><div class="chart-wrap"><canvas id="chartECD"></canvas></div></div>
+                <div class="chart-row"><div class="chart-row-header"><div class="chart-label"><div class="chart-label-dot" style="background:var(--cyan)"></div>Depth (m)</div><div class="chart-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Bit Depth</div><div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div>Hole Depth</div></div></div><div class="chart-wrap"><canvas id="chartDepth"></canvas></div></div>
+            </div>
+        </div>
+
+        <!-- HOLE CLEANING TAB -->
+        <div class="tab-content" id="tab-holecleaning">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><div class="card-title">TCR Analysis</div><div class="card-badge green">1.07 Ratio</div></div>
+                    <div class="card-body">
+                        <div class="grid-4" style="margin-bottom:14px">
+                            <div class="stat-box"><div class="stat-value orange">1,247</div><div class="stat-label">Measured (bbl)</div></div>
+                            <div class="stat-box"><div class="stat-value cyan">1,165</div><div class="stat-label">Theoretical (bbl)</div></div>
+                            <div class="stat-box"><div class="stat-value yellow">+82</div><div class="stat-label">Excess (bbl)</div></div>
+                            <div class="stat-box"><div class="stat-value green">1.07</div><div class="stat-label">TCR Ratio</div></div>
+                        </div>
+                        <div style="height:120px"><canvas id="chartTCRAnalysis"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Interval TCR by Depth (300m bins)</div><div class="card-badge">11 Intervals</div></div>
+                    <div class="card-body">
+                        <div class="depth-interval-container" id="depthIntervals"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top:14px">
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Shaker Load Distribution</div><div class="card-badge">Balanced</div></div>
+                    <div class="card-body">
+                        <div class="shaker-gauge-container">
+                            <div class="shaker-gauge">
+                                <div class="shaker-gauge-title">Camera 1</div>
+                                <svg class="shaker-gauge-svg" viewBox="0 0 120 70">
+                                    <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="#21262d" stroke-width="8" stroke-linecap="round"/>
+                                    <path d="M 10 60 A 50 50 0 0 1 85 18" fill="none" stroke="#3fb950" stroke-width="8" stroke-linecap="round"/>
+                                    <circle cx="60" cy="60" r="4" fill="#e6edf3"/>
+                                    <line x1="60" y1="60" x2="45" y2="30" stroke="#f26522" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                <div class="shaker-gauge-value">42%</div>
+                            </div>
+                            <div class="shaker-gauge">
+                                <div class="shaker-gauge-title">Camera 2</div>
+                                <svg class="shaker-gauge-svg" viewBox="0 0 120 70">
+                                    <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="#21262d" stroke-width="8" stroke-linecap="round"/>
+                                    <path d="M 10 60 A 50 50 0 0 1 95 35" fill="none" stroke="#3fb950" stroke-width="8" stroke-linecap="round"/>
+                                    <circle cx="60" cy="60" r="4" fill="#e6edf3"/>
+                                    <line x1="60" y1="60" x2="70" y2="25" stroke="#f26522" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                <div class="shaker-gauge-value">58%</div>
+                            </div>
+                        </div>
+                        <div class="shaker-grid">
+                            <div class="shaker-cell active"><div class="shaker-value">18%</div><div class="shaker-label">Screen 1</div></div>
+                            <div class="shaker-cell active"><div class="shaker-value">22%</div><div class="shaker-label">Screen 2</div></div>
+                            <div class="shaker-cell active"><div class="shaker-value">15%</div><div class="shaker-label">Screen 3</div></div>
+                            <div class="shaker-cell active"><div class="shaker-value">19%</div><div class="shaker-label">Screen 4</div></div>
+                            <div class="shaker-cell active"><div class="shaker-value">14%</div><div class="shaker-label">Screen 5</div></div>
+                            <div class="shaker-cell active"><div class="shaker-value">12%</div><div class="shaker-label">Screen 6</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">CSD Distribution</div><div class="card-badge">P50: 14.2mm</div></div>
+                    <div class="card-body">
+                        <div style="height:130px"><canvas id="chartCSD"></canvas></div>
+                        <div class="grid-4" style="margin-top:12px">
+                            <div class="stat-box"><div class="stat-value" style="color:var(--text-primary)">6.2</div><div class="stat-label">P10 (mm)</div></div>
+                            <div class="stat-box"><div class="stat-value" style="color:var(--text-primary)">10.1</div><div class="stat-label">P25 (mm)</div></div>
+                            <div class="stat-box"><div class="stat-value orange">14.2</div><div class="stat-label">P50 (mm)</div></div>
+                            <div class="stat-box"><div class="stat-value" style="color:var(--text-primary)">22.8</div><div class="stat-label">P90 (mm)</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="margin-top:14px">
+                <div class="card-header"><div class="card-title">UFO Events</div><div class="card-badge yellow">47 Total</div></div>
+                <div class="card-body">
+                    <div style="display:flex;gap:20px;align-items:flex-start">
+                        <div class="grid-3" style="flex:0 0 300px">
+                            <div class="stat-box"><div class="stat-value yellow">47</div><div class="stat-label">Total UFOs</div></div>
+                            <div class="stat-box"><div class="stat-value green">0.4</div><div class="stat-label">Rate (/hr)</div></div>
+                            <div class="stat-box"><div class="stat-value cyan">14.5</div><div class="stat-label">Per 100m</div></div>
+                        </div>
+                        <div style="flex:1;height:80px"><canvas id="chartUFO"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRIPPING TAB -->
+        <div class="tab-content" id="tab-tripping">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Hole Cleaning Status</div><div class="card-badge green">CLEAN</div></div>
+                    <div class="card-body">
+                        <div style="display:flex;gap:24px;align-items:flex-start">
+                            <div class="gauge-section">
+                                <div class="gauge-outer"><div class="gauge-inner"><div class="gauge-value">90%</div><div class="gauge-label">Clean</div></div></div>
+                                <div class="gauge-status">Hole is clean</div>
+                            </div>
+                            <div style="flex:1">
+                                <div class="progress-item"><div class="progress-header"><span class="progress-label">Bottoms-Up Circulation</span><span class="progress-value">2.8 / 3.0 cycles</span></div><div class="progress-bar"><div class="progress-fill green" style="width:93%"></div></div></div>
+                                <div class="progress-item"><div class="progress-header"><span class="progress-label">TCR Recovery Target</span><span class="progress-value">1,165 / 1,200 bbl</span></div><div class="progress-bar"><div class="progress-fill cyan" style="width:97%"></div></div></div>
+                                <div class="progress-item"><div class="progress-header"><span class="progress-label">Time Since Last UFO</span><span class="progress-value">18 min</span></div><div class="progress-bar"><div class="progress-fill green" style="width:100%"></div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Current Observations</div></div>
+                    <div class="card-body">
+                        <div class="status-grid">
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">TCR Ratio</span><span class="status-value good">1.07</span></div>
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">UFOs (last 2h)</span><span class="status-value good">3</span></div>
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">CSD Trend</span><span class="status-value good">Stable</span></div>
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">Circulation Quality</span><span class="status-value good">Good</span></div>
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">Time at TD</span><span class="status-value good">4.2 hrs</span></div>
+                            <div class="status-item"><div class="status-indicator good"></div><span class="status-label">Cuttings Volume</span><span class="status-value good">+82 bbl</span></div>
+                        </div>
+                        <div class="insight-box">
+                            <div class="insight-title">Observation Summary</div>
+                            <div class="insight-text">No cuttings observed at shakers for last 18 minutes. Circulation parameters stable. TCR ratio within normal range. Recommend completing final 0.2 bottoms-up cycle before proceeding.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPARE TAB -->
+        <div class="tab-content" id="tab-compare">
+            <div class="card" style="margin-bottom:14px">
+                <div class="card-header"><div class="card-title">Well Selection</div></div>
+                <div class="card-body">
+                    <div class="well-filter-row">
+                        <div class="preset-btns">
+                            <button class="preset-btn active">All Wells</button>
+                            <button class="preset-btn">Clean Wells</button>
+                            <button class="preset-btn">Problem Wells</button>
+                            <button class="preset-btn">Current Rig</button>
+                        </div>
+                        <div class="time-group">
+                            <span class="time-label">Section:</span>
+                            <button class="time-btn">17.5"</button>
+                            <button class="time-btn active">12.25"</button>
+                            <button class="time-btn">8.5"</button>
+                            <button class="time-btn">All</button>
+                        </div>
+                    </div>
+                    <div class="well-chips">
+                        <span class="well-chip selected">25_2-D-11 T3</span>
+                        <span class="well-chip selected">LIZ_3P13</span>
+                        <span class="well-chip selected">YT_3P06</span>
+                        <span class="well-chip">WT_1P05</span>
+                        <span class="well-chip">UA_2i02</span>
+                        <span class="well-chip">HH_1i01</span>
+                        <span class="well-chip">WT_1P06</span>
+                        <span class="well-chip">YT_1P10</span>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Performance Comparison</div></div>
+                    <div class="card-body">
+                        <table class="comparison-table">
+                            <thead><tr><th>Well ▼</th><th>Drilled (m)</th><th>TCR Ratio</th><th>UFO/100m</th><th>CSD P50</th><th>Severity</th></tr></thead>
+                            <tbody>
+                                <tr><td class="mono">25_2-D-11 T3</td><td class="mono">3,245</td><td class="mono good">1.07</td><td class="mono good">14.5</td><td class="mono">14.2</td><td class="good">● Clean</td></tr>
+                                <tr><td class="mono">LIZ_3P13</td><td class="mono">2,890</td><td class="mono good">0.98</td><td class="mono good">12.1</td><td class="mono">13.8</td><td class="good">● Clean</td></tr>
+                                <tr><td class="mono">YT_3P06</td><td class="mono">2,456</td><td class="mono good">1.02</td><td class="mono warning">28.4</td><td class="mono">15.1</td><td class="warning">● Elevated</td></tr>
+                                <tr><td class="mono">WT_1P05</td><td class="mono">3,102</td><td class="mono warning">1.18</td><td class="mono warning">35.2</td><td class="mono">16.4</td><td class="warning">● Elevated</td></tr>
+                                <tr><td class="mono">HH_1i01</td><td class="mono">2,780</td><td class="mono bad">1.42</td><td class="mono bad">89.3</td><td class="mono">18.7</td><td class="bad">● Problem</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">TCR by Depth Overlay</div></div>
+                    <div class="card-body"><div style="height:180px"><canvas id="chartCompare"></canvas></div></div>
+                </div>
+            </div>
+            <div class="grid-2" style="margin-top:14px">
+                <div class="card">
+                    <div class="card-header"><div class="card-title">UFO Correlation</div></div>
+                    <div class="card-body"><div style="height:160px"><canvas id="chartUFOScatter"></canvas></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Severity Distribution</div></div>
+                    <div class="card-body"><div style="height:160px"><canvas id="chartSeverity"></canvas></div></div>
+                </div>
+            </div>
+            <div class="insight-box" style="margin-top:14px">
+                <div class="insight-title">Benchmark Insight</div>
+                <div class="insight-text">Current well (25_2-D-11 T3) performing at 95th percentile vs offset wells. TCR ratio and UFO rate both within clean well benchmarks. LIZ_3P13 remains the cleanest reference well in this dataset with lowest UFO/100m metric.</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Sidebar
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        document.getElementById('menuBtn').addEventListener('click', () => { sidebar.classList.add('open'); overlay.classList.add('open'); });
+        document.getElementById('sidebarClose').addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('open'); });
+        overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('open'); });
+
+        // Well selector dropdown
+        const wellSelector = document.getElementById('wellSelector');
+        document.getElementById('wellSelectorBtn').addEventListener('click', () => wellSelector.classList.toggle('open'));
+        document.querySelectorAll('.well-dropdown-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.well-dropdown-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                wellSelector.classList.remove('open');
+            });
+        });
+        document.addEventListener('click', (e) => { if (!wellSelector.contains(e.target)) wellSelector.classList.remove('open'); });
+
+        // Tabs
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Buttons
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.parentElement.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.parentElement.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        document.querySelectorAll('.well-chip').forEach(chip => {
+            chip.addEventListener('click', () => chip.classList.toggle('selected'));
+        });
+
+        // Rig time
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('rigTime').textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour12: false });
+        }, 1000);
+
+        // Generate depth interval bars
+        const depthIntervals = [
+            { depth: '2700-3000', measured: 95, theoretical: 100, ratio: 0.95 },
+            { depth: '3000-3300', measured: 108, theoretical: 100, ratio: 1.08 },
+            { depth: '3300-3600', measured: 112, theoretical: 100, ratio: 1.12 },
+            { depth: '3600-3900', measured: 98, theoretical: 100, ratio: 0.98 },
+            { depth: '3900-4200', measured: 105, theoretical: 100, ratio: 1.05 },
+            { depth: '4200-4500', measured: 118, theoretical: 100, ratio: 1.18 },
+            { depth: '4500-4800', measured: 102, theoretical: 100, ratio: 1.02 },
+            { depth: '4800-5100', measured: 107, theoretical: 100, ratio: 1.07 },
+        ];
+        const depthContainer = document.getElementById('depthIntervals');
+        depthIntervals.forEach(d => {
+            const color = d.ratio < 0.85 ? '#00d4ff' : d.ratio <= 1.05 ? '#3fb950' : d.ratio <= 1.20 ? '#d29922' : '#f85149';
+            depthContainer.innerHTML += `
+                <div class="depth-bar-row">
+                    <div class="depth-label">${d.depth}m</div>
+                    <div class="depth-bar-wrap">
+                        <div class="depth-bar-measured" style="width:${Math.min(d.measured, 130)}%;background:${color}"></div>
+                        <div class="depth-bar-theoretical" style="left:${d.theoretical}%"></div>
+                    </div>
+                    <div class="depth-ratio" style="color:${color}">${d.ratio.toFixed(2)}</div>
+                </div>`;
+        });
+
+        // Data generation
+        function genData(n, base, variance, trend = 0) {
+            return Array.from({length: n}, (_, i) => base + Math.random() * variance - variance/2 + trend * i / n);
+        }
+
+        function genDrillingPattern(n) {
+            const data = { flowIn: [], flowOut: [], spp: [], rop: [], ecd: [], esd: [], esdIdx: [], bitDepth: [], holeDepth: [], measuredTCR: [], theoreticalTCR: [], acr: [] };
+            let depth = 3000, mTCR = 800, tTCR = 780;
+            for (let i = 0; i < n; i++) {
+                const drilling = (i % 40 < 35);
+                const baseFlow = drilling ? 950 : 400;
+                data.flowIn.push(baseFlow + Math.random() * 80 - 40);
+                data.flowOut.push(baseFlow * 0.97 + Math.random() * 60 - 30);
+                data.spp.push(drilling ? 4100 + Math.random() * 300 : 800 + Math.random() * 200);
+                data.rop.push(drilling ? 50 + Math.random() * 50 : 0);
+                const baseECD = 12.8 + depth / 20000;
+                data.ecd.push(baseECD + (drilling ? 0.25 : 0) + Math.random() * 0.08);
+                if (i % 8 === 0 || i % 13 === 0) { data.esd.push(baseECD - 0.15 + Math.random() * 0.04); data.esdIdx.push(i); }
+                if (drilling) depth += Math.random() * 1.5 + 0.3;
+                data.bitDepth.push(depth);
+                data.holeDepth.push(depth + (drilling ? 0 : -30));
+                const vol = drilling ? Math.random() * 0.4 + 0.2 : 0;
+                tTCR += vol * 0.95;
+                mTCR += vol * (0.92 + Math.random() * 0.2);
+                data.measuredTCR.push(mTCR);
+                data.theoreticalTCR.push(tTCR);
+                data.acr.push(tTCR > 0 ? (mTCR / tTCR) * 100 : 100);
+            }
+            return data;
+        }
+
+        const N = 360;
+        const drillData = genDrillingPattern(N);
+        const timeLabels = Array.from({length: N}, (_, i) => { const h = 8 + Math.floor(i / 60); const m = i % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); });
+
+        const chartOpts = {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: '#1c2128', borderColor: '#30363d', borderWidth: 1, titleFont: { family: 'JetBrains Mono', size: 11 }, bodyFont: { family: 'JetBrains Mono', size: 10 }, padding: 8 } },
+            scales: { x: { display: true, grid: { display: false }, ticks: { color: '#6e7681', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 8, maxRotation: 0 } }, y: { display: true, position: 'right', grid: { color: 'rgba(48,54,61,0.5)', drawBorder: false }, ticks: { color: '#6e7681', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 4, padding: 8 } } },
+            layout: { padding: { right: 10 } },
+            elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }
+        };
+
+        // Sparklines
+        function spark(id, data, color) {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            new Chart(ctx, { type: 'line', data: { labels: data.map((_, i) => i), datasets: [{ data, borderColor: color, backgroundColor: color + '20', fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, elements: { point: { radius: 0 }, line: { borderWidth: 2 } } } });
+        }
+        spark('sparkTCR', genData(30, 1.05, 0.08), '#3fb950');
+        spark('sparkUFO', genData(30, 0.5, 0.6), '#3fb950');
+        spark('sparkCRR', genData(30, 0.04, 0.02), '#00d4ff');
+        spark('sparkCSD', genData(30, 14, 4), '#f26522');
+        spark('sparkLag', genData(30, 3200, 100, 50), '#a371f7');
+
+        // Main charts
+        new Chart(document.getElementById('chartTCR'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.measuredTCR, borderColor: '#f26522', backgroundColor: 'rgba(242,101,34,0.25)', fill: true }, { data: drillData.theoreticalTCR, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.12)', fill: true }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 700 } } } });
+        new Chart(document.getElementById('chartACR'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.acr, borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.15)', fill: true }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 90, max: 120 } } } });
+        new Chart(document.getElementById('chartFlow'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.flowIn, borderColor: '#00d4ff', fill: false }, { data: drillData.flowOut, borderColor: '#f85149', fill: false }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 1100 } } } });
+        new Chart(document.getElementById('chartSPP'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.spp, borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,0.1)', fill: true }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 5000 } } } });
+        new Chart(document.getElementById('chartROP'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.rop, borderColor: '#f26522', backgroundColor: 'rgba(242,101,34,0.1)', fill: true }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 120 } } } });
+        const esdScatterData = drillData.esdIdx.map((idx, i) => ({ x: timeLabels[idx], y: drillData.esd[i] }));
+        new Chart(document.getElementById('chartECD'), { type: 'line', data: { labels: timeLabels, datasets: [{ type: 'line', data: drillData.ecd, borderColor: '#3fb950', fill: false }, { type: 'scatter', data: esdScatterData, backgroundColor: '#f472b6', borderColor: '#f472b6', pointRadius: 4 }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 12.5, max: 13.5 } } } });
+        new Chart(document.getElementById('chartDepth'), { type: 'line', data: { labels: timeLabels, datasets: [{ data: drillData.bitDepth, borderColor: '#00d4ff', fill: false }, { data: drillData.holeDepth, borderColor: '#f472b6', borderDash: [4, 2], fill: false }] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, reverse: true, min: 2900, max: 3500 } } } });
+
+        // Hole Cleaning charts
+        new Chart(document.getElementById('chartTCRAnalysis'), { type: 'line', data: { labels: Array.from({length: 50}, (_, i) => i), datasets: [{ data: genData(50, 1100, 200, 150), borderColor: '#f26522', backgroundColor: 'rgba(242,101,34,0.2)', fill: true }, { data: genData(50, 1050, 150, 120), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.1)', fill: true }] }, options: { ...chartOpts, scales: { x: { display: false }, y: chartOpts.scales.y } } });
+        new Chart(document.getElementById('chartCSD'), { type: 'bar', data: { labels: ['0-5', '5-10', '10-15', '15-20', '20-25', '25-30', '>30'], datasets: [{ data: [8, 18, 32, 22, 12, 5, 3], backgroundColor: ['#3fb950', '#3fb950', '#f26522', '#f26522', '#d29922', '#d29922', '#f85149'] }] }, options: { ...chartOpts, scales: { x: { display: true, grid: { display: false }, ticks: { color: '#6e7681', font: { size: 10 } } }, y: { ...chartOpts.scales.y, min: 0 } } } });
+        new Chart(document.getElementById('chartUFO'), { type: 'line', data: { labels: Array.from({length: 40}, (_, i) => i), datasets: [{ data: genData(40, 1, 1.5), borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.15)', fill: true }] }, options: { ...chartOpts, scales: { x: { display: false }, y: chartOpts.scales.y } } });
+
+        // Compare charts
+        new Chart(document.getElementById('chartCompare'), { type: 'line', data: { labels: Array.from({length: 30}, (_, i) => (2800 + i * 50)), datasets: [{ label: '25_2-D-11', data: genData(30, 1.05, 0.1), borderColor: '#f26522', fill: false }, { label: 'LIZ_3P13', data: genData(30, 0.98, 0.08), borderColor: '#3fb950', fill: false }, { label: 'YT_3P06', data: genData(30, 1.02, 0.12), borderColor: '#d29922', fill: false }] }, options: { ...chartOpts, plugins: { ...chartOpts.plugins, legend: { display: true, position: 'top', labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12, padding: 10 } } }, scales: { x: { display: true, grid: { display: false }, ticks: { color: '#6e7681', font: { size: 9 }, maxTicksLimit: 6 } }, y: chartOpts.scales.y } } });
+        
+        // UFO Scatter
+        new Chart(document.getElementById('chartUFOScatter'), { type: 'scatter', data: { datasets: [{ label: 'Wells', data: [{ x: 3245, y: 47 }, { x: 2890, y: 35 }, { x: 2456, y: 70 }, { x: 3102, y: 109 }, { x: 2780, y: 248 }], backgroundColor: ['#3fb950', '#3fb950', '#d29922', '#d29922', '#f85149'], pointRadius: 8 }] }, options: { ...chartOpts, plugins: { legend: { display: false } }, scales: { x: { display: true, title: { display: true, text: 'Drilled (m)', color: '#6e7681', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.3)' }, ticks: { color: '#6e7681', font: { size: 9 } } }, y: { display: true, position: 'right', title: { display: true, text: 'UFO Count', color: '#6e7681', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,0.3)' }, ticks: { color: '#6e7681', font: { size: 9 } } } } } });
+        
+        // Severity Distribution
+        new Chart(document.getElementById('chartSeverity'), { type: 'bar', data: { labels: ['Clean (0)', 'Minor (1)', 'Elevated (2)', 'Problem (3)'], datasets: [{ data: [5, 3, 4, 2], backgroundColor: ['#3fb950', '#56d364', '#d29922', '#f85149'] }] }, options: { ...chartOpts, indexAxis: 'y', scales: { x: { display: true, grid: { color: 'rgba(48,54,61,0.3)' }, ticks: { color: '#6e7681' } }, y: { display: true, grid: { display: false }, ticks: { color: '#8b949e', font: { size: 10 } } } } } });
+    </script>
+</body>
+</html>

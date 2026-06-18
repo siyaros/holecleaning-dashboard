@@ -1,0 +1,22 @@
+{
+  "name": "workspace_20260513_224508",
+  "created_at": "2026-05-13T22:45:08.691655",
+  "active_dataset": "Data Export - Rig Data _ 25_2-D-12 T5 - 12.25_-data-as-joinbyfield-2026-04-20 18_33_41.csv",
+  "datasets": [
+    "Data Export - Rig Data _ 25_2-D-12 T5 - 12.25_-data-as-joinbyfield-2026-04-20 18_33_41.csv"
+  ],
+  "plot_config": {
+    "x_axis": "time",
+    "y_primary": [
+      "Theoretical TCR (m3)",
+      "Theoretical Lag TCR (m3)",
+      "Measured TCR (m3)"
+    ],
+    "y_secondary": [
+      "ROP (m/h)"
+    ],
+    "chart_type": "line"
+  },
+  "subplots": [],
+  "kpi_configs": []
+}
